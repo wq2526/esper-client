@@ -54,12 +54,22 @@ public class EsperClient {
 		Random random = new Random();
 		
 		try {
-			BufferedReader br = new BufferedReader(new FileReader("src/allData.txt"));
-			for(int i=0;i<1000;i++){
+			BufferedReader br = new BufferedReader(new FileReader("src/disk3G.txt"));
+			while(br.readLine()!=null){
 				String s = br.readLine();
-				String[] str = s.split("\t");
+				String[] str;
+				try{
+					str = s.split("\t");
+				}catch(NullPointerException e){
+					continue;
+				}
 				SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSS+00:00");
-				Date date = simpleDateFormat.parse(str[0]);
+				Date date = null;
+				try{
+					date = simpleDateFormat.parse(str[0]);
+				}catch(ParseException e){
+					continue;
+				}
 				long ts = date.getTime();
 				Map<String, Object> event = new HashMap<String, Object>();
 				event.put("ts", ts);
@@ -71,7 +81,7 @@ public class EsperClient {
 				event.put("bm09", random.nextInt(2));
 				event.put("bm10", random.nextInt(2));
 				//System.out.println(new JSONObject(event).toString());
-				sendEvent(event, "CDataPoint");
+				sendEvent(event, "DataPoint");
 			}
 			br.close();
 		} catch (FileNotFoundException e) {
@@ -80,10 +90,10 @@ public class EsperClient {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} catch (ParseException e) {
+		} /*catch (ParseException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+		}*/
 		
 	}
 	
@@ -106,7 +116,7 @@ public class EsperClient {
 			String json = jsonEventRenderer.render(newEvents[0]);
 			
 			JSONObject jsonObj = new JSONObject(json);
-			//System.out.println(eventType + ":" + jsonObj.toString());
+			System.out.println(eventType + ":" + jsonObj.toString());
 			Map<String, Object> event = jsonObj.toMap();
 			
 			sendEvent(event, eventType);
@@ -123,6 +133,25 @@ public class EsperClient {
 		System.out.println("start time:" + dateFormat.format(start));
 		
 		EsperClient ec = new EsperClient();
+		
+		Map<String, Object> dataDef0 = new HashMap<String, Object>();
+		dataDef0.put("ts", int.class);
+		dataDef0.put("index", String.class);
+		dataDef0.put("mf01", String.class);
+		dataDef0.put("mf02", String.class);
+		dataDef0.put("mf03", String.class);
+		dataDef0.put("pc13", String.class);
+		dataDef0.put("pc14", String.class);
+		dataDef0.put("pc15", String.class);
+		dataDef0.put("pc25", String.class);
+		dataDef0.put("pc26", String.class);
+		dataDef0.put("pc27", String.class);
+		dataDef0.put("bm05", int.class);
+		dataDef0.put("bm06", int.class);
+		dataDef0.put("bm07", int.class);
+		dataDef0.put("bm08", int.class);
+		dataDef0.put("bm09", int.class);
+		dataDef0.put("bm10", int.class);
 		
 		Map<String, Object> dataDef = new HashMap<String, Object>();
 		dataDef.put("ts", int.class);
@@ -191,6 +220,7 @@ public class EsperClient {
 		data710AlarmDef.put("alarm", int.class);
 		data710AlarmDef.put("ts710", int.class);
 		
+		ec.addEventType("DataPoint", dataDef0);
 		ec.addEventType("CDataPoint", dataDef);
 		
 		ec.addEventType("C05DataPoint", data05Def);
@@ -208,6 +238,7 @@ public class EsperClient {
 		ec.addEventType("C710DataPoint", data710Def);
 		ec.addEventType("Alarm710DataPoint", data710AlarmDef);
 		
+		String epl0 = "select ts,index,bm05,bm06,bm07,bm08,bm09,bm10 from DataPoint";
 		String epl1 = "select ts,index,bm05,sum(bm05) as sumbm05 from CDataPoint#length(2) having sum(bm05)=1";
 		String epl2 = "select ts,index,bm08,sum(bm08) as sumbm08 from CDataPoint#length(2) having sum(bm08)=1";
 		String epl3 = "select (C05DataPoint.ts-C08DataPoint.ts) as ts58 from C05DataPoint#lastevent,C08DataPoint#lastevent";
@@ -222,6 +253,8 @@ public class EsperClient {
 		String epl10 = "select ts,index,bm10,sum(bm10) as sumbm10 from CDataPoint#length(2) having sum(bm10)=1";
 		String epl11 = "select (C07DataPoint.ts-C10DataPoint.ts) as ts710 from C07DataPoint#lastevent,C10DataPoint#lastevent";
 		String epl12 = "insert into Alarm710DataPoint (alarm,ts710) select 1,ts710 from C710DataPoint where ts710>1.01*(select ts710 from C710DataPoint#length(2)).firstOf()";
+		
+		ec.addDataListener("CDataPoint", ec.createStmt(epl0));
 		
 		ec.addDataListener("C05DataPoint", ec.createStmt(epl1));
 		ec.addDataListener("C08DataPoint", ec.createStmt(epl2));
